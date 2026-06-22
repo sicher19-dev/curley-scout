@@ -1,0 +1,4309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Arm Scout — No Brand Baseball Analytics</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;900&family=Archivo+Narrow:wght@600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   ARM SCOUT — reusable per-arm pregame scouting tool
+   No Brand Baseball Analytics
+   Single file. All data lives in the ARM_DATA block below.
+   Swap ARM_DATA to retarget the tool to any pitcher.
+   ============================================================ */
+:root{
+  --bg:#0a0a0b; --bg2:#111114; --card:#16161a; --card2:#1c1c22;
+  --line:#2a2a31; --ink:#f2f2f0; --dim:#8b8b93; --dimmer:#5c5c63;
+  --gold:#f0b429; --gold-soft:#caa14a;
+  --elite:#ef5350; --elite-bg:rgba(239,83,80,.10); --elite-line:rgba(239,83,80,.45);
+  --high:#f0a829;  --high-bg:rgba(240,168,41,.08);  --high-line:rgba(240,168,41,.45);
+  --med:#d4d152;   --med-bg:rgba(212,209,82,.07);   --med-line:rgba(212,209,82,.4);
+  --low:#54d98c;   --low-bg:rgba(84,217,140,.07);   --low-line:rgba(84,217,140,.4);
+  --attack:#54d98c; --attack-bg:rgba(84,217,140,.06); --attack-line:rgba(84,217,140,.35);
+  --avoid:#ef6b6b;  --avoid-bg:rgba(239,107,107,.06); --avoid-line:rgba(239,107,107,.35);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--ink)}
+body{
+  font-family:'Archivo',sans-serif; line-height:1.45;
+  background:
+    radial-gradient(1200px 600px at 80% -10%, rgba(240,180,41,.05), transparent 60%),
+    radial-gradient(900px 500px at -10% 100%, rgba(84,217,140,.03), transparent 55%),
+    var(--bg);
+  min-height:100vh; padding-bottom:64px;
+}
+.wrap{max-width:760px;margin:0 auto;padding:0 16px}
+.mono{font-family:'JetBrains Mono',monospace}
+
+/* ---------- top bar ---------- */
+.topbar{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:18px 16px 14px;max-width:760px;margin:0 auto;
+}
+.brand{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.16em;color:var(--gold-soft);text-transform:uppercase}
+.sample{
+  font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;
+  color:#ffd27a;border:1px solid rgba(240,180,41,.4);background:rgba(240,180,41,.08);
+  padding:4px 8px;border-radius:5px;white-space:nowrap
+}
+
+/* ---------- arm header ---------- */
+.arm{padding:6px 0 8px}
+.arm h1{
+  font-family:'Archivo',sans-serif;font-weight:900;font-size:42px;line-height:.95;
+  letter-spacing:-.02em;margin:0;text-transform:uppercase
+}
+.arm .sub{font-family:'JetBrains Mono',monospace;font-size:12.5px;color:var(--dim);margin-top:8px;letter-spacing:.04em}
+.arm .sub b{color:var(--ink);font-weight:700}
+.rep{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.pill{
+  font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.03em;
+  padding:4px 9px;border-radius:99px;border:1px solid var(--line);color:var(--dim);
+  display:inline-flex;align-items:center;gap:6px
+}
+.pill .dot{width:7px;height:7px;border-radius:99px}
+
+/* ---------- arsenal (shapes) ---------- */
+.ars{display:flex;flex-direction:column;gap:10px}
+.apitch{border:1px solid var(--line);border-radius:13px;background:var(--card);padding:12px 14px}
+.apitch .r1{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap}
+.apitch .nm{font-family:'Archivo Narrow',sans-serif;font-weight:700;font-size:17px;letter-spacing:.03em;text-transform:uppercase;display:inline-flex;align-items:center;gap:8px}
+.apitch .nm .dot{width:9px;height:9px;border-radius:99px}
+.apitch .use{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--gold)}
+.apitch .wf{margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--low)}
+.apitch .usebar{height:6px;border-radius:99px;background:var(--card2);overflow:hidden;margin:8px 0 9px}
+.apitch .usebar i{display:block;height:100%;border-radius:99px}
+.apitch .specs{display:flex;flex-wrap:wrap;gap:5px 14px;font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--dim)}
+.apitch .specs b{color:#dcdcd8;font-weight:500}
+.planmap{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--gold-soft);margin-top:3px}
+
+/* ---------- section heading ---------- */
+.sec{margin-top:30px}
+.sec-h{
+  font-family:'Archivo Narrow',sans-serif;font-weight:700;font-size:21px;letter-spacing:.06em;
+  color:var(--gold);text-transform:uppercase;display:flex;align-items:center;gap:12px;margin-bottom:14px
+}
+.sec-h::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,var(--line),transparent)}
+
+/* ---------- bottom line keys ---------- */
+.keys{border:1px solid var(--high-line);border-radius:16px;background:linear-gradient(180deg,rgba(240,180,41,.04),rgba(240,180,41,.01));padding:6px 18px}
+.key{display:flex;gap:16px;padding:18px 0;border-bottom:1px solid var(--line)}
+.key:last-child{border-bottom:0}
+.key .num{
+  flex:none;width:30px;height:30px;border-radius:99px;background:var(--gold);color:#1a1400;
+  font-family:'Archivo',sans-serif;font-weight:900;font-size:15px;display:grid;place-items:center;margin-top:2px
+}
+.key .txt{font-size:16px;line-height:1.5;color:#dcdcd8}
+.key .txt b{color:#fff;font-weight:700}
+.g{color:var(--low);font-weight:600}.r{color:var(--avoid);font-weight:600}.y{color:var(--gold);font-weight:600}
+
+/* ---------- legend ---------- */
+.legend{display:flex;flex-wrap:wrap;gap:14px;margin-bottom:8px}
+.legend span{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--dim);display:inline-flex;align-items:center;gap:6px}
+.legend i{width:11px;height:11px;border-radius:3px;display:inline-block}
+.hint{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--dimmer);margin:6px 0 16px;letter-spacing:.02em}
+
+/* ---------- team selector ---------- */
+.teams{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 10px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.teams::-webkit-scrollbar{display:none}
+.team{
+  flex:none;font-family:'Archivo Narrow',sans-serif;font-weight:700;font-size:14px;letter-spacing:.04em;
+  padding:9px 15px;border-radius:11px;border:1px solid var(--line);background:var(--card);color:var(--dim);
+  cursor:pointer;transition:.15s;white-space:nowrap;text-transform:uppercase
+}
+.team:hover{border-color:var(--dimmer);color:var(--ink)}
+.team.on{background:var(--gold);border-color:var(--gold);color:#1a1400}
+
+/* ---------- hitter cards ---------- */
+.cards{display:flex;flex-direction:column;gap:12px}
+.hcard{
+  border:1px solid var(--line);border-radius:16px;background:var(--card);padding:16px 16px 14px;cursor:pointer;
+  transition:.15s;position:relative;overflow:hidden
+}
+.hcard:active{transform:scale(.992)}
+.hcard:hover{border-color:var(--dimmer)}
+.hcard .row1{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.hcard .slot{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--dimmer)}
+.tier{
+  font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.12em;
+  padding:4px 9px;border-radius:7px;text-transform:uppercase
+}
+.tier.elite{color:var(--elite);background:var(--elite-bg);border:1px solid var(--elite-line)}
+.tier.high{color:var(--high);background:var(--high-bg);border:1px solid var(--high-line)}
+.tier.med{color:var(--med);background:var(--med-bg);border:1px solid var(--med-line)}
+.tier.low{color:var(--low);background:var(--low-bg);border:1px solid var(--low-line)}
+.hcard h3{font-family:'Archivo',sans-serif;font-weight:900;font-size:27px;letter-spacing:-.01em;margin:2px 0 4px;text-transform:uppercase}
+.hcard .meta{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--dim);letter-spacing:.03em}
+.aa{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.aa .box{border-radius:11px;padding:10px 12px;text-align:center}
+.aa .box .lab{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;letter-spacing:.14em}
+.aa .box .val{font-family:'Archivo Narrow',sans-serif;font-weight:700;font-size:15px;margin-top:3px}
+.aa .attack{background:var(--attack-bg);border:1px solid var(--attack-line)}
+.aa .attack .lab{color:var(--attack)} .aa .attack .val{color:#bff0d4}
+.aa .avoid{background:var(--avoid-bg);border:1px solid var(--avoid-line)}
+.aa .avoid .lab{color:var(--avoid)} .aa .avoid .val{color:#f3c4c4}
+.tapcue{position:absolute;right:14px;bottom:12px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--dimmer);letter-spacing:.08em}
+.hcard.lim{opacity:.72;border-style:dashed}
+.chips{display:flex;align-items:center;gap:7px}
+.limbadge{font-family:'JetBrains Mono',monospace;font-size:9.5px;font-weight:700;letter-spacing:.1em;color:#ffb74d;background:rgba(255,183,77,.10);border:1px solid rgba(255,183,77,.4);padding:3px 7px;border-radius:6px;white-space:nowrap}
+.limnote{font-family:'JetBrains Mono',monospace;font-size:11px;color:#ffb74d;background:rgba(255,183,77,.08);border:1px solid rgba(255,183,77,.3);border-radius:8px;padding:8px 11px;margin-top:12px;line-height:1.5}
+
+/* ---------- hitter detail (sheet) ---------- */
+.sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(3px);opacity:0;pointer-events:none;transition:.2s;z-index:40}
+.sheet-bg.on{opacity:1;pointer-events:auto}
+.sheet{
+  position:fixed;left:50%;bottom:0;transform:translate(-50%,100%);width:100%;max-width:760px;
+  background:var(--bg2);border:1px solid var(--line);border-bottom:0;border-radius:20px 20px 0 0;
+  z-index:50;transition:transform .26s cubic-bezier(.22,1,.36,1);max-height:92vh;overflow-y:auto;padding:8px 18px 36px
+}
+.sheet.on{transform:translate(-50%,0)}
+.grab{width:42px;height:4px;border-radius:99px;background:var(--line);margin:8px auto 12px}
+.sheet .sh1{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.sheet h2{font-family:'Archivo',sans-serif;font-weight:900;font-size:30px;letter-spacing:-.01em;margin:0;text-transform:uppercase}
+.sheet .smeta{font-family:'JetBrains Mono',monospace;font-size:12.5px;color:var(--dim);margin-top:6px;letter-spacing:.03em}
+.blk-h{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.16em;color:var(--gold-soft);text-transform:uppercase;margin:24px 0 12px}
+
+/* zone grid */
+.zonewrap{display:flex;gap:18px;align-items:center;flex-wrap:wrap}
+.zone{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;width:200px}
+.cell{aspect-ratio:1;border-radius:7px;display:grid;place-items:center;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:#0c0c0c}
+.zlabels{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--dim);line-height:1.7}
+.zlabels .scale{display:flex;align-items:center;gap:7px;margin-top:8px}
+.scale .bar{width:90px;height:9px;border-radius:99px;background:linear-gradient(90deg,#1f8a4c,#d4d152,#ef5350)}
+.toggle{display:flex;gap:6px;margin:12px 0 4px;flex-wrap:wrap}
+.toggle button{
+  font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;
+  padding:6px 11px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--dim);cursor:pointer
+}
+.toggle button.on{background:var(--card2);border-color:var(--gold-soft);color:var(--gold)}
+
+/* buckets */
+.bucket{margin:10px 0}
+.bucket .top{display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-size:12px;margin-bottom:5px}
+.bucket .top .nm{color:#d8d8d4}.bucket .top .vl{color:var(--dim)}
+.track{height:9px;border-radius:99px;background:var(--card2);overflow:hidden}
+.fill{height:100%;border-radius:99px}
+.note{font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--dim);line-height:1.6;margin-top:6px}
+
+/* footer */
+.foot{max-width:760px;margin:34px auto 0;padding:18px 16px 0;border-top:1px solid var(--line)}
+.foot p{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--dimmer);line-height:1.7;letter-spacing:.02em;margin:3px 0}
+.foot .src{color:var(--gold-soft)}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <span class="brand">No Brand Baseball Analytics</span>
+  <span class="sample" id="sampleBadge">Sample data</span>
+</div>
+
+<div class="wrap">
+
+  <!-- ARM HEADER -->
+  <div class="arm">
+    <h1 id="armName">—</h1>
+    <div class="sub" id="armSub">—</div>
+    <div class="rep" id="armRep"></div>
+  </div>
+
+  <!-- ARSENAL (optional, rendered if ARM_DATA.arsenal present) -->
+  <div class="sec" id="arsSec" style="display:none">
+    <div class="sec-h">Arsenal — Shapes</div>
+    <div class="ars" id="ars"></div>
+  </div>
+
+  <!-- BOTTOM LINE -->
+  <div class="sec">
+    <div class="sec-h">Bottom Line — 5 Keys</div>
+    <div class="keys" id="keys"></div>
+  </div>
+
+  <!-- OPPONENTS -->
+  <div class="sec">
+    <div class="sec-h">Opponents — Tap a Team</div>
+    <div class="legend">
+      <span><i style="background:var(--elite)"></i>Elite</span>
+      <span><i style="background:var(--high)"></i>High</span>
+      <span><i style="background:var(--med)"></i>Med</span>
+      <span><i style="background:var(--low)"></i>Low</span>
+    </div>
+    <div class="hint">ATTACK / AVOID = your best & worst bucket by xwOBACON · tap a hitter for the in-zone map</div>
+    <div class="teams" id="teams"></div>
+    <div class="cards" id="cards"></div>
+  </div>
+
+</div>
+
+<!-- HITTER DETAIL SHEET -->
+<div class="sheet-bg" id="sheetBg" onclick="closeSheet()"></div>
+<div class="sheet" id="sheet">
+  <div class="grab"></div>
+  <div class="sh1">
+    <div>
+      <h2 id="dName">—</h2>
+      <div class="smeta" id="dMeta">—</div>
+    </div>
+    <span class="tier" id="dTier">—</span>
+  </div>
+
+  <div class="blk-h">In-Zone Tendency — catcher's view</div>
+  <div class="toggle" id="metricToggle"></div>
+  <div class="zonewrap">
+    <div class="zone" id="zone"></div>
+    <div class="zlabels">
+      <div id="zoneMetricLabel">xwOBACON by zone</div>
+      <div style="color:var(--dimmer)">Up / middle / down · in→out</div>
+      <div class="scale"><span style="color:var(--low)">cold</span><span class="bar"></span><span style="color:var(--elite)">hot</span></div>
+    </div>
+  </div>
+
+  <div class="blk-h">Pitch-Bucket Damage</div>
+  <div id="buckets"></div>
+
+  <div class="blk-h">Plan</div>
+  <div class="aa" style="margin-top:0">
+    <div class="box attack"><div class="lab">ATTACK</div><div class="val" id="dAttack">—</div></div>
+    <div class="box avoid"><div class="lab">AVOID</div><div class="val" id="dAvoid">—</div></div>
+  </div>
+  <div class="note" id="dNote"></div>
+</div>
+
+<div class="foot">
+  <p class="src" id="footSrc">Data: —</p>
+  <p id="footNote">—</p>
+  <p>No Brand Baseball Analytics · Arm Scout</p>
+</div>
+
+<script>
+/* =================================================================
+   ARM_DATA — the only block you edit per pitcher.
+   Schema is documented inline. Fields marked OPTIONAL degrade
+   gracefully when missing (e.g. AA arms without movement data).
+   ================================================================= */
+const ARM_DATA = {
+  "meta": {
+    "name": "BRIAN CURLEY",
+    "hand": "R",
+    "line": "RHP \u00b7 D-backs / High-A Hillsboro (NWL) \u00b7 location-only level",
+    "asOf": "as of 2026-06-22",
+    "isSample": false,
+    "source": "Data: MLB Stats API (High-A \u2014 no Hawk-Eye). Opponent wOBACON results-based; zones from calibrated legacy coords; no pitch-type/movement/EV tracking at this level.",
+    "note": "A+ full-season reference: results-based wOBACON; no movement/EV at this level; zones from calibrated legacy coords."
+  },
+  "repertoire": [
+    {
+      "name": "4-Seam",
+      "color": "#ef5350"
+    },
+    {
+      "name": "Slider",
+      "color": "#54d98c"
+    },
+    {
+      "name": "Cutter",
+      "color": "#f0a829"
+    },
+    {
+      "name": "Curve",
+      "color": "#b388ff"
+    }
+  ],
+  "keys": [
+    {
+      "n": 1,
+      "html": "<b>Heater up is your game.</b> The top third draws the most whiffs (<span class='g'>27%</span> vs 19% middle) and grades coldest for 28 of 74 NWL bats \u2014 your mid-90s/triple-digit fastball up in the zone is where this league misses."
+    },
+    {
+      "n": 2,
+      "html": "<b>Slider down is the put-away.</b> Your best pitch buried beneath the zone is the two-strike out \u2014 the bottom third still chases and whiffs (25%)."
+    },
+    {
+      "n": 3,
+      "html": "<b>Don't groove the heater middle-up.</b> Up is also a damage third (<span class='r'>.502 wOBACON</span>) when it leaks over the plate \u2014 climb above the zone for the chase, not down Broadway."
+    },
+    {
+      "n": 4,
+      "html": "<b>Cutter and curve steal early strikes.</b> Change the eye level and get ahead so you can elevate the four-seam and spin the slider with two strikes."
+    },
+    {
+      "n": 5,
+      "html": "<b>Respect the top, attack the bottom.</b> <span class='y'>28 of 74</span> grade high or elite \u2014 pitch backwards there; pound the 31 low-tier bats in the zone. (Small-league sample \u2014 trust the stuff over the cells.)"
+    }
+  ],
+  "zoneMetrics": [
+    {
+      "key": "xwobacon",
+      "label": "wOBACON"
+    },
+    {
+      "key": "whiff",
+      "label": "Whiff%"
+    },
+    {
+      "key": "freq",
+      "label": "Pitch%"
+    }
+  ],
+  "arsenal": [],
+  "bucketMap": {},
+  "opponents": [
+    {
+      "abbr": "EVE",
+      "name": "AquaSox",
+      "hitters": [
+        {
+          "slot": 1,
+          "name": "Matthew Ellis",
+          "bats": "L",
+          "pos": "C",
+          "woba": ".419",
+          "tier": "elite",
+          "attack": "Down",
+          "avoid": "Up",
+          "note": "Most damage up (0.827); coldest down.",
+          "zone": {
+            "xwobacon": [
+              0.84,
+              1.015,
+              0.0,
+              0.71,
+              0.548,
+              0.88,
+              0.266,
+              0.532,
+              0.617
+            ],
+            "whiff": [
+              7,
+              44,
+              22,
+              15,
+              20,
+              17,
+              27,
+              43,
+              14
+            ],
+            "freq": [
+              14,
+              13,
+              5,
+              10,
+              17,
+              6,
+              10,
+              13,
+              12
+            ]
+          },
+          "pa": 116,
+          "limited": false
+        },
+        {
+          "slot": 2,
+          "name": "Jonny Farmelo",
+          "bats": "L",
+          "pos": "OF",
+          "woba": ".401",
+          "tier": "elite",
+          "attack": "Middle",
+          "avoid": "Up",
+          "note": "Most damage up (0.587); coldest middle.",
+          "zone": {
+            "xwobacon": [
+              0.722,
+              0.626,
+              0.41,
+              0.528,
+              0.541,
+              0.278,
+              0.609,
+              0.548,
+              0.492
+            ],
+            "whiff": [
+              16,
+              13,
+              25,
+              46,
+              20,
+              0,
+              40,
+              12,
+              29
+            ],
+            "freq": [
+              11,
+              15,
+              7,
+              10,
+              15,
+              9,
+              9,
+              14,
+              11
+            ]
+          },
+          "pa": 230,
+          "limited": false
+        },
+        {
+          "slot": 3,
+          "name": "Felnin Celesten",
+          "bats": "L",
+          "pos": "SS",
+          "woba": ".398",
+          "tier": "elite",
+          "attack": "Up",
+          "avoid": "Down",
+          "note": "Most damage down (0.494); coldest up.",
+          "zone": {
+            "xwobacon": [
+              0.587,
+              0.408,
+              0.251,
+              0.341,
+              0.367,
+              0.786,
+              0.33,
+              0.529,
+              0.632
+            ],
+            "whiff": [
+              41,
+              12,
+              19,
+              24,
+              15,
+              0,
+              6,
+              22,
+              18
+            ],
+            "freq": [
+              10,
+              10,
+              7,
+              13,
+              21,
+              9,
+              8,
+              12,
+              9
+            ]
+          },
+          "pa": 209,
+          "limited": false
+        },
+        {
+          "slot": 4,
+          "name": "Luke Stevenson",
+          "bats": "L",
+          "pos": "C",
+          "woba": ".390",
+          "tier": "elite",
+          "attack": "Down",
+          "avoid": "Up",
+          "note": "Most damage up (0.63); coldest down.",
+          "zone": {
+            "xwobacon": [
+              1.353,
+              0.179,
+              0.74,
+              0.11,
+              0.463,
+              0.473,
+              0.176,
+              0.503,
+              0.0
+            ],
+            "whiff": [
+              50,
+              32,
+              25,
+              29,
+              26,
+              18,
+              0,
+              31,
+              8
+            ],
+            "freq": [
+              11,
+              12,
+              9,
+              13,
+              16,
+              9,
+              10,
+              10,
+              9
+            ]
+          },
+          "pa": 182,
+          "limited": false
+        },
+        {
+          "slot": 5,
+          "name": "Brandon Eike",
+          "bats": "R",
+          "pos": "3B",
+          "woba": ".381",
+          "tier": "elite",
+          "attack": "Down",
+          "avoid": "Middle",
+          "note": "Most damage middle (0.571); coldest down.",
+          "zone": {
+            "xwobacon": [
+              0.0,
+              0.592,
+              1.015,
+              0.994,
+              0.607,
+              0.176,
+              0.88,
+              0.251,
+              0.648
+            ],
+            "whiff": [
+              0,
+              18,
+              31,
+              6,
+              10,
+              11,
+              25,
+              26,
+              36
+            ],
+            "freq": [
+              8,
+              13,
+              10,
+              11,
+              18,
+              11,
+              3,
+              13,
+              12
+            ]
+          },
+          "pa": 156,
+          "limited": false
+        },
+        {
+          "slot": 6,
+          "name": "Axel Sanchez",
+          "bats": "R",
+          "pos": "SS",
+          "woba": ".368",
+          "tier": "high",
+          "attack": "Down",
+          "avoid": "Up",
+          "note": "Most damage up (0.774); coldest down.",
+          "zone": {
+            "xwobacon": [
+              0.0,
+              1.522,
+              0.44,
+              1.263,
+              0.293,
+              0.293,
+              0.0,
+              0.0,
+              0.0
+            ],
+            "whiff": [
+              0,
+              23,
+              50,
+              25,
+              15,
+              25,
+              0,
+              29,
+              50
+            ],
+            "freq": [
+              8,
+              15,
+              12,
+              10,
+              15,
+              7,
+              6,
+              22,
+              7
+            ]
+          },
+          "pa": 68,
+          "limited": false
+        },
+        {
+          "slot": 7,
+          "name": "Curtis Washington Jr.",
+          "bats": "R",
+          "pos": "CF",
+          "woba": ".363",
+          "tier": "high",
+          "attack": "Down",
+          "avoid": "Up",
+          "note": "Most damage up (0.651); coldest down.",
+          "zone": {
+            "xwobacon": [
+              0.722,
+              0.524,
+              0.97,
+              0.237,
+              0.612,
+              0.44,
+              0.0,
+              0.126,
+              0.147
+            ],
+            "whiff": [
+              19,
+              24,
+              40,
+              27,
+              9,
+              0,
+              33,
+              13,
+              27
+            ],
+            "freq": [
+              10,
+              16,
+              5,
+              12,
+              17,
+              8,
+              8,
+              12,
+              14
+            ]
+          },
+          "pa": 126,
+          "limited": false
+        },
+        {
+          "slot": 8,
+          "name": "Josh Caron",
+          "bats": "R",
+          "pos": "C",
+          "woba": ".358",
+          "tier": "high",
+          "attack": "Up",
+          "avoid": "Middle",
+          "note": "Most damage middle (0.615); coldest up.",
+          "zone": {
+            "xwobacon": [
+              0.22,
+              0.354,
+              0.574,
+              0.71,
+              0.737,
+              0.179,
+              0.44,
+              0.522,
+              0.22
+            ],
+            "whiff": [
+              14,
+              25,
+              31,
+              6,
+              14,
+              19,
+              25,
+              20,
+              45
+            ],
+            "freq": [
+              9,
+              15,
+              10,
+              9,
+              14,
+              14,
+              4,
+              11,
+              14
+            ]
+          },
+          "pa": 164,
+          "limited": false
+        },
+        {
+          "slot": 9,
+          "name": "Carlos Jimenez",
+          "bats": "L",
+          "pos": "CF",
+          "woba": ".356",
+          "tier": "high",
+          "attack": "Down",
+          "avoid": "Middle",
+          "note": "Most damage middle (0.488); coldest down.",
+          "zone": {
+            "xwobacon": [
+              0.334,
+              0.462,
+              0.625,
+              0.46,
+              0.512,
+              0.496,
+              0.25,
+              0.237,
+              0.307
+            ],
+            "whiff": [
+              27,
+              17,
+              14,
+              24,
+              29,
+              25,
+              14,
+              27,
+              24
+            ],
+            "freq": [
+              15,
+              11,
+              6,
+              13,
+              12,
+              10,
+              9,
+              13,
+              12
+            ]
+          },
+          "pa": 192,
+          "limited": false
+        },
+        {
+          "slot": 10,
+          "name": "Austin St. Laurent",
+          "bats": "R",
+          "pos": "3B",
+          "woba": ".333",
+          "tier": "med",
+          "attack": "Down",
+          "avoid": "Up",
+          "note": "Most damage up (0.505); coldest down.",
+          "zone": {
+            "xwobacon": [
+              0.485,
+              0.587,
+              0.44,
+              0.0,
+              0.693,
+              0.176,
+              0.44,
+              0.352,
+              0.0
+            ],
+            "whiff": [
+              7,
+              27,
+              50,
+              0,
+              25,
+              11,
+              0,
+              18,
+              50
+            ],
+            "freq": [
+              15,
+              13,
+              11,
+              1,
+              18,
+              12,
+              5,
+              14,
+              10
+            ]
+          },
+          "pa": 112,
+          "limited": false
+        },
+        {
+          "slot": 11,
+          "name": "Luis Suisbel",
+          "bats": "L",
+          "pos": "3B",
+          "woba": ".317",
+          "tier": "low",
+          "attack": "Middle",
+          "avoid": "Up",
+          "note": "Most damage up (0.51); coldest middle.",
+          "zone": {
+            "xwobacon": [
+              0.883,
+              0.369,
+              0.147,
+              0.266,
+              0.459,
+              0.11,
+              0.354,
+              0.274,
+              0.677
+            ],
+            "whiff": [
+              23,
+              13,
+              14,
+              23,
+              9,
+              6,
+              22,
+              22,
+              29
+            ],
+            "freq": [
+              12,
+              11,
+              7,
+              13,
+              10,
+              10,
+              10,
+              16,
+              10
+            ]
+          },
+          "pa": 154,
+          "limited": false
+        },
+        {
+          "slot": 12,
+          "name": "Anthony Donofrio",
+          "bats": "L",
+          "pos": "OF",
+          "woba": ".313",
+          "tier": "low",
+          "attack": "Down",
+          "avoid": "Up",
+          "note": "Most damage up (0.541); coldest down.",
+          "zone": {
+            "xwobacon": [
+              0.0,
+              0.44,
+              1.455,
+              0.147,
+              0.428,
+              0.474,
+              0.44,
+              0.059,
+              0.507
+            ],
+            "whiff": [
+              33,
+              42,
+              17,
+              15,
+              24,
+              7,
+              8,
+              4,
+              0
+            ],
+            "freq": [
+              11,
+              10,
+              5,
+              15,
+              19,
+              9,
+              9,
+              14,
+              8
+            ]
+          },
+          "pa": 121,
+          "limited": false
+        },
+        {
+          "slot": 13,
+          "name": "Carter Dorighi",
+          "bats": "L",
+          "pos": "SS",
+          "woba": ".286",
+          "tier": "low",
+          "attack": "Middle",
+          "avoid": "Down",
+          "note": "Most damage down (0.433); coldest middle.",
+          "zone": {
+            "xwobacon": [
+              0.0,
+              0.24,
+              0.74,
+              0.0,
+              0.378,
+              0.43,
+              0.293,
+              0.669,
+              0.176
+            ],
+            "whiff": [
+              11,
+              16,
+              0,
+              13,
+              13,
+              4,
+              17,
+              16,
+              33
+            ],
+            "freq": [
+              9,
+              12,
+              8,
+              10,
+              17,
+              12,
+              10,
+              12,
+              9
+            ]
+          },
+          "pa": 172,
+          "limited": false
+        }
+      ]
+    },
+    {
+      "abbr": "VAN",
+      "name": "Canadians",
+      "hitters": [
+        {
+          "slot": 1,
+          "name": "Sam Shaw",
+          "bats": "L",
+          "pos": "OF",
+          "woba": ".484",
+          "tier": "elite",
+          "attack": "Middle",
+          "avoid": "Down",
+          "note": "Most damage down (1.04); coldest middle.",
+          "zone": {
+            "xwobacon": [
+              2.03,
+              0.0,
+              0.88,
+              0.0,
+              0.0,
+              0.823,
+              2.03,
+              0.625,
+              0.88
+            ],
+            "whiff": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              12,
+              0,
+              25,
+              0
+            ],
+            "freq": [
+              12,
+              15,
+              6,
+              3,
+              18,
+              15,
+              10,
+              10,
+              10
+            ]
+          },
+          "pa": 42,
+          "limited": false
+        },
+        {
+          "slot": 2,
+          "name": "Carter Cunningham",
+          "bats": "L",
+          "pos": "OF",
+          "woba": ".429",
+          "tier": "elite",
+          "attack": "Up",
+          "avoid": "Down",
+          "note": "Most damage down (0.608); coldest up.",
+          "zone": {
+            "xwobacon": [
+              0.0,
+              0.208,
+              0.632,
+              0.0,
+              0.531,
+              0.459,
+              0.63,
+              0.578,
+              0.727
+            ],
+            "whiff": [
+              64,
+              33,
+              25,
+              41,
+              14,
+              10,
+              35,
+              5,
+              19
+            ],
+            "freq": [
+              8,
+              14,
+              8,
+              12,
+              14,
+              9,
+              11,
+              16,
+              9
+            ]
+          },
+          "pa": 169,
+          "limited": false
+        },
+        {
+          "slot": 3,
+          "name": "Tucker Toman",
+          "bats": "L",
+          "pos": "SS",
+          "woba": ".396",
+          "tier": "elite",
+          "attack": "Down",
+          "avoid": "Middle",
+          "note": "Most damage middle (0.593); coldest down.",
+          "zone": {
+            "xwobacon": [
+              0.727,
+              0.556,
+              0.352,
+              0.713,
+              0.517,
+              0.628,
+              0.502,
+              0.656,
+              0.0
+            ],
+            "whiff": [
+              54,
+              26,
+              8,
+              21,
+              17,
+              6,
+              0,
+              21,
+              33
+            ],
+            "freq": [
+              13,
+              11,
+              7,
+              14,
+              19,
+              7,
+              10,
+              11,
+              8
+            ]
+          },
+          "pa": 179,
+          "limited": false
+        },
+        {
+          "slot": 4,
+          "name": "Peyton Williams",
+          "bats": "L",
+          "pos": "1B",
+          "woba": ".385",
+          "tier": "elite",
+          "attack": "Down",
+          "avoid": "Middle",
+          "note": "Most damage middle (0.476); coldest down.",
+          "zone": {
+            "xwobacon": [
+              0.364,
+              0.71,
+              0.22,
+              0.864,
+              0.528,
+              0.156,
+              0.417,
+              0.551,
+              0.126
+            ],
+            "whiff": [
+              6,
+              28,
+              10,
+              17,
+              15,
+              5,
+              17,
+              17,
+              12
+            ],
+            "freq": [
+              10,
+              9,
+              6,
+              12,
+              18,
+              12,
+              7,
+              14,
+              12
+            ]
+          },
+          "pa": 129,
+          "limited": false
+        },
+        {
+          "slot": 5,
+          "name": "Jacob Sharp",
+          "bats": "R",
+          "pos": "C",
+          "woba": ".368",
+          "tier": "high",
+          "attack": "Down",
+          "avoid": "Up",
+          "note": "Most damage up (0.471); coldest down.",
+          "zone": {
+            "xwobacon": [
+              0.0,
+              0.601,
+              0.532,
+              0.464,
+              0.64,
+              0.11,
+              0.0,
+              0.677,
+              0.301
+            ],
+            "whiff": [
+              12,
+              5,
+              17,
+              0,
+              21,
+              24,
+              0,
+              33,
+              8
+            ],
+            "freq": [
+              7,
+              13,
+              12,
+              10,
+              16,
+              16,
+              6,
+              11,
+              9
+            ]
+          },
+          "pa": 116,
+          "limited": false
+        },
+        {
+          "slot": 6,
+          "name": "Dub Gleed",
+          "bats": "R",
+          "pos": "SS",
+          "woba": ".359",
+          "tier": "high",
+          "attack": "Down",
+          "avoid": "Up",
+          "note": "Most damage up (0.575); coldest down.",
+          "zone": {
+            "xwobacon": [
+              0.883,
+              0.503,
+              0.147,
+              0.324,
+              0.693,
+              0.177,
+              0.727,
+              0.264,
+              0.251
+            ],
+            "whiff": [
+              14,
+              7,
+              17,
+              5,
+              11,
+              5,
+              33,
+              10,
+              19
+            ],
+            "freq": [
+              12,
+              12,
+              9,
+              9,
+              14,
+              14,
+              4,
+              16,
+              10
+            ]
+          },
+          "pa": 148,
+          "limited": false
+        },
+        {
+          "slot": 7,
+          "name": "Brennan Orf",
+          "bats": "L",
+          "pos": "OF",
+          "woba": ".352",
+          "tier": "med",
+          "attack": "Up",
+          "avoid": "Down",
+          "note": "Most damage down (0.417); coldest up.",
+          "zone": {
+            "xwobacon": [
+              0.0,
+              0.293,
+              0.22,
+              0.577,
+              0.532,
+              0.0,
+              0.352,
+              0.583,
+              0.0
+            ],
+            "whiff": [
+              40,
+              57,
+              14,
+              35,
+              20,
+              0,
+              21,
+              0,
+              40
+            ],
+            "freq": [
+              13,
+              11,
+              8,
+              17,
+              13,
+              7,
+              13,
+              9,
+              9
+            ]
+          },
+          "pa": 99,
+          "limited": false
+        },
+        {
+          "slot": 8,
+          "name": "Arjun Nimmala",
+          "bats": "R",
+          "pos": "SS",
+          "woba": ".351",
+          "tier": "med",
+          "attack": "Down",
+          "avoid": "Middle",
+          "note": "Most damage middle (0.416); coldest down.",
+          "zone": {
+            "xwobacon": [
+              0.156,
+              0.625,
+              0.0,
+              0.647,
+              0.293,
+              0.0,
+              0.0,
+              0.0,
+              0.352
+            ],
+            "whiff": [
+              0,
+              27,
+              0,
+              10,
+              0,
+              40,
+              33,
+              38,
+              30
+            ],
+            "freq": [
+              14,
+              13,
+              8,
+              14,
+              11,
+              8,
+              8,
+              10,
+              14
+            ]
+          },
+          "pa": 75,
+          "limited": false
+        },
+        {
+          "slot": 9,
+          "name": "Alexis Hernandez",
+          "bats": "R",
+          "pos": "LF",
+          "woba": ".343",
+          "tier": "med",
+          "attack": "Middle",
+          "avoid": "Down",
+          "note": "Most damage down (0.484); coldest middle.",
+          "zone": {
+            "xwobacon": [
+              0.126,
+              0.758,
+              0.22,
+              0.63,
+              0.188,
+              0.266,
+              0.605,
+              0.515,
+              0.266
+            ],
+            "whiff": [
+              0,
+              35,
+              65,
+              5,
+              21,
+              29,
+              0,
+              23,
+              21
+            ],
+            "freq": [
+              6,
+              12,
+              9,
+              12,
+              15,
+              12,
+              8,
+              13,
+              14
+            ]
+          },
+          "pa": 184,
+          "limited": false
+        },
+        {
+          "slot": 10,
+          "name": "Hayden Gilliland",
+          "bats": "L",
+          "pos": "C",
+          "woba": ".323",
+          "tier": "med",
+          "attack": "Up",
+          "avoid": "Down",
+          "note": "Most damage down (0.378); coldest up.",
+          "zone": {
+            "xwobacon": [
+              0.0,
+              0.44,
+              0.0,
+              0.547,
+              0.25,
+              0.0,
+              0.0,
+              0.126,
+              0.658
+            ],
+            "whiff": [
+              14,
+              14,
+              0,
+              15,
+              21,
+              10,
+              33,
+              25,
+              14
+            ],
+            "freq": [
+              12,
+              8,
+              6,
+              12,
+              15,
+              8,
+              10,
+              12,
+              17
+            ]
+          },
+          "pa": 86,
+          "limited": false
+        },
+        {
+          "slot": 11,
+          "name": "Maddox Latta",
+          "bats": "R",
+          "pos": "2B",
+          "woba": ".304",
+          "tier": "low",
+          "attack": "Up",
+          "avoid": "Middle",
+          "note": "Most damage middle (0.442); coldest up.",
+          "zone": {
+            "xwobacon": [
+              0.0,
+              0.0,
+              0.0,
+              0.522,
+              0.428,
+              0.293,
+              0.477,
+              0.0,
+              0.44
+            ],
+            "whiff": [
+              38,
+              32,
+              83,
+              0,
+              17,
+              8,
+              10,
+              13,
+              25
+            ],
+            "freq": [
+              9,
+              13,
+              8,
+              11,
+              17,
+              12,
+              9,
+              9,
+              12
+            ]
+          },
+          "pa": 164,
+          "limited": false
+        },
+        {
+          "slot": 12,
+          "name": "Kendry Chirinos",
+          "bats": "R",
+          "pos": "3B",
+          "woba": ".304",
+          "tier": "low",
+          "attack": "Down",
+          "avoid": "Up",
+          "note": "Most damage up (0.673); coldest down.",
+          "zone": {
+            "xwobacon": [
+              0.835,
+              1.015,
+              0.406,
+              0.795,
+              0.282,
+              0.0,
+              0.0,
+              0.44,
+              0.312
+            ],
+            "whiff": [
+              26,
+              42,
+              44,
+              8,
+              10,
+              18,
+              17,
+              25,
+              50
+            ],
+            "freq": [
+              13,
+              10,
+              8,
+              9,
+              23,
+              13,
+              5,
+              9,
+              10
+            ]
+          },
+          "pa": 108,
+          "limited": false
+        },
+        {
+          "slot": 13,
+          "name": "Matt Scannell",
+          "bats": "L",
+          "pos": "OF",
+          "woba": ".294",
+          "tier": "low",
+          "attack": "Up",
+          "avoid": "Middle",
+          "note": "Most damage middle (0.476); coldest up.",
+          "zone": {
+            "xwobacon": [
+              0.0,
+              0.0,
+              0.0,
+              0.948,
+              0.596,
+              0.0,
+              0.0,
+              0.503,
+              0.417
+            ],
+            "whiff": [
+              40,
+              62,
+              23,
+              44,
+              24,
+              13,
+              17,
+              21,
+              20
+            ],
+            "freq": [
+              13,
+              12,
+              11,
+              14,
+              16,
+              11,
+              4,
+              11,
+              9
+            ]
+          },
+          "pa": 116,
+          "limited": false
+        },
+        {
+          "slot": 14,
+          "name": "Manuel Beltre",
+          "bats": "R",
+          "pos": "SS",
+          "woba": ".281",
+          "tier": "low",
+          "attack": "Middle",
+          "avoid": "Down",
+          "note": "Most damage down (0.597); coldest middle.",
+          "zone": {
+            "xwobacon": [
+              0.176,
+              0.529,
+              0.176,
+              0.126,
+              0.264,
+              0.22,
+              0.88,
+              0.427,
+              0.926
+            ],
+            "whiff": [
+              7,
+              5,
+              0,
+              18,
+              32,
+              21,
+              38,
+              15,
+              46
+            ],
+            "freq": [
+              10,
+              13,
+              9,
+              10,
+              14,
+              13,
+              6,
+              14,
+              10
+            ]
+          },
+          "pa": 125,
+          "limited": false
+        },
+        {
+          "slot": 15,
+          "name": "J.R. Freethy",
+          "bats": "L",
+          "pos": "2B",
+          "woba": ".279",
+          "tier": "low",
+          "attack": "Down",
+          "avoid": "Up",
+          "note": "Most damage up (0.316); coldest down.",
+          "zone": {
+            "xwobacon": [
+              0.0,
+              0.727,
+              0.147,
+              0.632,
+              0.399,
+              0.068,
+              0.08,
+              0.604,
+              0.098
+            ],
+            "whiff": [
+              29,
+              30,
+              12,
+              21,
+              18,
+              4,
+              0,
+              12,
+              5
+            ],
+            "freq": [
+              12,
+              11,
+              8,
+              11,
+              15,
+              11,
+              9,
+              13,
+              9
+            ]
+          },
+          "pa": 187,
+          "limited": false
+        },
+        {
+          "slot": 16,
+          "name": "Edward Duran",
+          "bats": "R",
+          "pos": "C",
+          "woba": ".177",
+          "tier": "low",
+          "attack": "Down",
+          "avoid": "Middle",
+          "note": "Most damage middle (0.377); coldest down.",
+          "zone": {
+            "xwobacon": [
+              0.0,
+              0.44,
+              0.0,
+              0.88,
+              0.293,
+              0.0,
+              0.0,
+              0.44,
+              0.0
+            ],
+            "whiff": [
+              20,
+              11,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              50
+            ],
+            "freq": [
+              11,
+              18,
+              6,
+              10,
+              10,
+              10,
+              8,
+              18,
+              10
+            ]
+          },
+          "pa": 43,
+          "limited": false
+        },
+        {
+          "slot": 17,
+          "name": "Eric Snow",
+          "bats": "R",
+          "pos": "SS",
+          "woba": ".460",
+          "tier": "elite",
+          "attack": "Middle",
+          "avoid": "Down",
+          "note": "Most damage down (0.587); coldest middle.",
+          "zone": {
+            "xwobacon": [
+              0.625,
+              0.44,
+              0.0,
+              0.625,
+              0.507,
+              0.0,
+              0.0,
+              0.0,
+              0.88
+            ],
+            "whiff": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              33
+            ],
+            "freq": [
+              6,
+              24,
+              4,
+              16,
+              14,
+              10,
+              2,
+              12,
+              14
+            ]
+          },
+          "pa": 27,
+          "limited": true
+        }
+      ]
+    },
+    {
+      "abbr": "TRI",
+      "name": "Dust Devils",
+      "hitters": [
+        {
+          "slot": 1,
+          "name": "Anthony Scull",
+          "bats": "L",
+          "pos": "OF",
+          "woba": ".391",
+          "tier": "elite",
+          "attack": "Up",
+          "avoid": "Down",
+          "note": "Most damage down (0.7); coldest up.",
+          "zone": {
+            "xwobacon": [
+              0.098,
+              0.774,
+              0.251,
+              0.264,
+              0.563,
+              0.598,
+              0.22,
+              0.583,
+              1.174
+            ],
+            "whiff": [
+              25,
+              18,
+              0,
+              11,
+              12,
+              5,
+              30,
+              30,
+              35
+            ],
+            "freq": [
+              9,
+              10,
+              9,
+              11,
+              17,
+              9,
+              8,
+              15,
+              12
+            ]
+          },
+          "pa": 174,
+          "limited": false
+        },
+        {
+          "slot": 2,
+          "name": "Juan Flores",
+          "bats": "R",
+          "pos": "C",
+          "woba": ".390",
+          "tier": "elite",
+          "attack": "Middle",
+          "avoid": "Up",
+          "note": "Most damage up (0.607); coldest middle.",
+          "zone": {
+            "xwobacon": [
+              0.677,
+              0.594,
+              0.582,
+              0.147,
+              0.459,
+              0.451,
+              0.832,
+              0.566,
+              0.32
+            ],
+            "whiff": [
+              8,
+              11,
+              13,
+              33,
+              8,
+              22,
+              0,
+              15,
+              12
+            ],
+            "freq": [
+              8,
+              12,
+              12,
+              8,
+              17,
+              13,
+              7,
+              9,
+              15
+            ]
+          },
+          "pa": 146,
+          "limited": false
+        },
+        {
+          "slot": 3,
+          "name": "Caleb Bartolero",
+          "bats": "R",
+          "pos": "C",
+          "woba": ".378",
+          "tier": "high",
+          "attack": "Up",
+          "avoid": "Down",
+          "note": "Most damage down (0.495); coldest up.",
+          "zone": {
+            "xwobacon": [
+              0.312,
+              0.0,
+              0.0,
+              0.477,
+              0.627,
+              0.251,
+              1.25,
+              0.477,
+              0.432
+            ],
+            "whiff": [
+              10,
+              8,
+              33,
+              31,
+              0,
+              10,
+              0,
+              18,
+              14
+            ],
+            "freq": [
+              14,
+              11,
+              10,
+              11,
+              11,
+              8,
+              8,
+              14,
+              14
+            ]
+          },
+          "pa": 113,
+          "limited": false
+        },
+        {
+          "slot": 4,
+          "name": "Randy De Jesus",
+          "bats": "R",
+          "pos": "OF",
+          "woba": ".358",
+          "tier": "high",
+          "attack": "Up",
+          "avoid": "Down",
+          "note": "Most damage down (0.801); coldest up.",
+          "zone": {
+            "xwobacon": [
+              0.176,
+              0.147,
+              0.176,
+              0.637,
+              0.832,
+              0.147,
+              0.486,
+              0.927,
+              0.892
+            ],
+            "whiff": [
+              45,
+              32,
+              31,
+              5,
+              18,
+              28,
+              5,
+              14,
+              29
+            ],
+            "freq": [
+              10,
+              11,
+              9,
+              11,
+              14,
+              10,
+              9,
+              13,
+              14
+            ]
+          },
+          "pa": 192,
+          "limited": false
+        },
+        {
+          "slot": 5,
+          "name": "Ryan Nicholson",
+          "bats": "L",
+          "pos": "1B",
+          "woba": ".357",
+          "tier": "high",
+          "attack": "Middle",
+          "avoid": "Up",
+          "note": "Most damage up (0.574); coldest middle.",
+          "zone": {
+            "xwobacon": [
+              0.647,
+              0.667,
+              0.355,
+              0.43,
+              0.215,
+              0.758,
+              0.717,
+              0.462,
+              0.213
+            ],
+            "whiff": [
+              20,
+              25,
+              0,
+              16,
+              15,
+              18,
+              13,
+              18,
+              22
+            ],
+            "freq": [
+              12,
+              12,
+              6,
+              13,
+              16,
+              8,
+              9,
+              13,
+              11
+            ]
+          },
+          "pa": 155,
+          "limited": false
+        },
+        {
+          "slot": 6,
+          "name": "Jake Munroe",
+          "bats": "R",
+          "pos": "3B",
+          "woba": ".343",
+          "tier": "med",
+          "attack": "Middle",
+          "avoid": "Up",
+          "note": "Most damage up (0.493); coldest middle.",
+          "zone": {
+            "xwobacon": [
+              0.774,
+              0.307,
+              0.44,
+              0.251,
+              0.219,
+              0.125,
+              0.43,
+              0.435,
+              0.0
+            ],
+            "whiff": [
+              17,
+              20,
+              0,
+              16,
+              14,
+              16,
+              6,
+              17,
+              24
+            ],
+            "freq": [
+              9,
+              13,
+              5,
+              10,
+              13,
+              14,
+              8,
+              15,
+              12
+            ]
+          },
+          "pa": 177,
+          "limited": false
+        },
+        {
+          "slot": 7,
+          "name": "Matt Coutney",
+          "bats": "L",
+          "pos": "1B",
+          "woba": ".339",
+          "tier": "med",
+          "attack": "Up",
+          "avoid": "Down",
+          "note": "Most damage down (0.459); coldest up.",
+          "zone": {
+            "xwobacon": [
+              0.176,
+              0.519,
+              0.0,
+              0.899,
+              0.32,
+              0.33,
+              0.377,
+              0.425,
+              1.015
+            ],
+            "whiff": [
+              37,
+              34,
+              33,
+              24,
+              9,
+              22,
+              6,
+              3,
+              25
+            ],
+            "freq": [
+              8,
+              14,
+              7,
+              12,
+              14,
+              8,
+              10,
+              16,
+              11
+            ]
+          },
+          "pa": 188,
+          "limited": false
+        },
+        {
+          "slot": 8,
+          "name": "Gage Harrelson",
+          "bats": "L",
+          "pos": "OF",
+          "woba": ".327",
+          "tier": "med",
+          "attack": "Up",
+          "avoid": "Down",
+          "note": "Most damage down (0.39); coldest up.",
+          "zone": {
+            "xwobacon": [
+              0.0,
+              0.0,
+              0.0,
+              0.293,
+              0.355,
+              0.22,
+              0.0,
+              0.434,
+              0.377
+            ],
+            "whiff": [
+              55,
+              30,
+              33,
+              45,
+              42,
+              20,
+              40,
+              20,
+              11
+            ],
+            "freq": [
+              10,
+              8,
+              10,
+              12,
+              17,
+              10,
+              9,
+              16,
+              9
+            ]
+          },
+          "pa": 104,
+          "limited": false
+        },
+        {
+          "slot": 9,
+          "name": "Aaron Graeber",
+          "bats": "L",
+          "pos": "OF",
+          "woba": ".283",
+          "tier": "low",
+          "attack": "Middle",
+          "avoid": "Down",
+          "note": "Most damage down (0.727); coldest middle.",
+          "zone": {
+            "xwobacon": [
+              0.0,
+              0.629,
+              0.0,
+              0.0,
+              0.417,
+              0.507,
+              0.0,
+              0.88,
+              0.677
+            ],
+            "whiff": [
+              25,
+              25,
+              50,
+              43,
+              25,
+              14,
+              25,
+              60,
+              22
+            ],
+            "freq": [
+              9,
+              19,
+              7,
+              16,
+              10,
+              10,
+              10,
+              7,
+              13
+            ]
+          },
+          "pa": 51,
+          "limited": false
+        },
+        {
+          "slot": 10,
+          "name": "Peter Burns",
+          "bats": "L",
+          "pos": "C",
+          "woba": ".276",
+          "tier": "low",
+          "attack": "Up",
+          "avoid": "Middle",
+          "note": "Most damage middle (0.484); coldest up.",
+          "zone": {
+            "xwobacon": [
+              0.44,
+              0.176,
+              0.0,
+              0.0,
+              0.538,
+              0.82,
+              0.293,
+              0.417,
+              0.0
+            ],
+            "whiff": [
+              25,
+              8,
+              10,
+              10,
+              15,
+              0,
+              0,
+              33,
+              29
+            ],
+            "freq": [
+              11,
+              11,
+              8,
+              11,
+              19,
+              10,
+              9,
+              10,
+              10
+            ]
+          },
+          "pa": 76,
+          "limited": false
+        },
+        {
+          "slot": 11,
+          "name": "Jorge Ruiz",
+          "bats": "L",
+          "pos": "OF",
+          "woba": ".275",
+          "tier": "low",
+          "attack": "Down",
+          "avoid": "Up",
+          "note": "Most damage up (0.43); coldest down.",
+          "zone": {
+            "xwobacon": [
+              0.376,
+              0.532,
+              0.352,
+              0.377,
+              0.462,
+              0.0,
+              0.0,
+              0.0,
+              0.312
+            ],
+            "whiff": [
+              21,
+              0,
+              0,
+              23,
+              11,
+              0,
+              25,
+              7,
+              22
+            ],
+            "freq": [
+              12,
+              11,
+              8,
+              17,
+              18,
+              8,
+              6,
+              12,
+              8
+            ]
+          },
+          "pa": 114,
+          "limited": false
+        },
+        {
+          "slot": 12,
+          "name": "Adrian Placencia",
+          "bats": "L",
+          "pos": "SS",
+          "woba": ".269",
+          "tier": "low",
+          "attack": "Middle",
+          "avoid": "Up",
+          "note": "Most damage up (0.656); coldest middle.",
+          "zone": {
+            "xwobacon": [
+              1.015,
+              0.0,
+              0.417,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0
+            ],
+            "whiff": [
+              50,
+              67,
+              20,
+              29,
+              57,
+              0,
+              14,
+              55,
+              100
+            ],
+            "freq": [
+              10,
+              13,
+              10,
+              10,
+              11,
+              4,
+              13,
+              17,
+              12
+            ]
+          },
+          "pa": 50,
+          "limited": false
+        },
+        {
+          "slot": 13,
+          "name": "Capri Ortiz",
+          "bats": "R",
+          "pos": "3B",
+          "woba": ".263",
+          "tier": "low",
+          "attack": "Up",
+          "avoid": "Middle",
+          "note": "Most damage middle (0.348); coldest up.",
+          "zone": {
+            "xwobacon": [
+              0.364,
+              0.323,
+              0.293,
+              0.11,
+              0.493,
+              0.338,
+              0.88,
+              0.126,
+              0.528
+            ],
+            "whiff": [
+              21,
+              22,
+              16,
+              9,
+              21,
+              32,
+              0,
+              25,
+              47
+            ],
+            "freq": [
+              12,
+              13,
+              13,
+              7,
+              17,
+              14,
+              3,
+              11,
+              12
+            ]
+          },
+          "pa": 173,
+          "limited": false
+        },
+        {
+          "slot": 14,
+          "name": "Johan Macias",
+          "bats": "L",
+          "pos": "SS",
+          "woba": ".248",
+          "tier": "low",
+          "attack": "Up",
+          "avoid": "Middle",
+          "note": "Most damage middle (0.323); coldest up.",
+          "zone": {
+            "xwobacon": [
+              0.098,
+              0.421,
+              0.406,
+              0.371,
+              0.44,
+              0.196,
+              0.098,
+              0.471,
+              0.312
+            ],
+            "whiff": [
+              18,
+              26,
+              12,
+              20,
+              18,
+              4,
+              25,
+              24,
+              27
+            ],
+            "freq": [
+              10,
+              12,
+              7,
+              14,
+              12,
+              15,
+              10,
+              12,
+              8
+            ]
+          },
+          "pa": 137,
+          "limited": false
+        },
+        {
+          "slot": 15,
+          "name": "David Mershon",
+          "bats": "L",
+          "pos": "SS",
+          "woba": ".248",
+          "tier": "low",
+          "attack": "Middle",
+          "avoid": "Down",
+          "note": "Most damage down (0.389); coldest middle.",
+          "zone": {
+            "xwobacon": [
+              0.0,
+              0.22,
+              0.29,
+              0.0,
+              0.251,
+              0.293,
+              0.44,
+              0.304,
+              0.88
+            ],
+            "whiff": [
+              29,
+              25,
+              0,
+              14,
+              10,
+              17,
+              33,
+              29,
+              17
+            ],
+            "freq": [
+              8,
+              14,
+              14,
+              10,
+              13,
+              8,
+              6,
+              20,
+              6
+            ]
+          },
+          "pa": 72,
+          "limited": false
+        },
+        {
+          "slot": 16,
+          "name": "Kevin Bruggeman",
+          "bats": "R",
+          "pos": "C",
+          "woba": ".247",
+          "tier": "low",
+          "attack": "Up",
+          "avoid": "Down",
+          "note": "Most damage down (0.196); coldest up.",
+          "zone": {
+            "xwobacon": [
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.22,
+              0.22
+            ],
+            "whiff": [
+              0,
+              0,
+              0,
+              0,
+              29,
+              40,
+              0,
+              25,
+              14
+            ],
+            "freq": [
+              15,
+              9,
+              9,
+              10,
+              15,
+              8,
+              3,
+              16,
+              15
+            ]
+          },
+          "pa": 57,
+          "limited": false
+        }
+      ]
+    },
+    {
+      "abbr": "EUG",
+      "name": "Emeralds",
+      "hitters": [
+        {
+          "slot": 1,
+          "name": "Jean Carlos Sio",
+          "bats": "L",
+          "pos": "IF",
+          "woba": ".436",
+          "tier": "elite",
+          "attack": "Up",
+          "avoid": "Middle",
+          "note": "Most damage middle (0.718); coldest up.",
+          "zone": {
+            "xwobacon": [
+              0.885,
+              0.352,
+              0.0,
+              0.88,
+              0.714,
+              0.677,
+              0.0,
+              0.0,
+              0.0
+            ],
+            "whiff": [
+              0,
+              12,
+              0,
+              25,
+              0,
+              0,
+              0,
+              20,
+              67
+            ],
+            "freq": [
+              21,
+              16,
+              6,
+              6,
+              19,
+              7,
+              9,
+              10,
+              7
+            ]
+          },
+          "pa": 48,
+          "limited": false
+        },
+        {
+          "slot": 2,
+          "name": "Jancel Villarroel",
+          "bats": "R",
+          "pos": "C",
+          "woba": ".435",
+          "tier": "elite",
+          "attack": "Down",
+          "avoid": "Up",
+          "note": "Most damage up (0.694); coldest down.",
+          "zone": {
+            "xwobacon": [
+              0.44,
+              0.492,
+              1.455,
+              0.43,
+              0.555,
+              0.937,
+              0.0,
+              0.85,
+              0.147
+            ],
+            "whiff": [
+              29,
+              21,
+              16,
+              0,
+              6,
+              19,
+              25,
+              20,
+              25
+            ],
+            "freq": [
+              6,
+              15,
+              13,
+              6,
+              14,
+              19,
+              4,
+              11,
+              13
+            ]
+          },
+          "pa": 109,
+          "limited": false
+        },
+        {
+          "slot": 3,
+          "name": "Trevor Cohen",
+          "bats": "L",
+          "pos": "OF",
+          "woba": ".384",
+          "tier": "elite",
+          "attack": "Middle",
+          "avoid": "Down",
+          "note": "Most damage down (0.464); coldest middle.",
+          "zone": {
+            "xwobacon": [
+              0.493,
+              0.451,
+              0.266,
+              0.377,
+              0.417,
+              0.331,
+              0.304,
+              0.507,
+              0.486
+            ],
+            "whiff": [
+              11,
+              11,
+              32,
+              15,
+              7,
+              16,
+              8,
+              3,
+              11
+            ],
+            "freq": [
+              12,
+              12,
+              9,
+              12,
+              17,
+              10,
+              6,
+              11,
+              11
+            ]
+          },
+          "pa": 237,
+          "limited": false
+        },
+        {
+          "slot": 4,
+          "name": "Carlos Gutierrez",
+          "bats": "L",
+          "pos": "OF",
+          "woba": ".360",
+          "tier": "high",
+          "attack": "Down",
+          "avoid": "Up",
+          "note": "Most damage up (0.533); coldest down.",
+          "zone": {
+            "xwobacon": [
+              0.541,
+              0.55,
+              0.514,
+              0.428,
+              0.476,
+              0.426,
+              0.194,
+              0.736,
+              0.474
+            ],
+            "whiff": [
+              43,
+              28,
+              7,
+              23,
+              12,
+              6,
+              10,
+              19,
+              19
+            ],
+            "freq": [
+              14,
+              10,
+              7,
+              12,
+              16,
+              8,
+              11,
+              14,
+              9
+            ]
+          },
+          "pa": 183,
+          "limited": false
+        },
+        {
+          "slot": 5,
+          "name": "Jakob Christian",
+          "bats": "R",
+          "pos": "OF",
+          "woba": ".350",
+          "tier": "med",
+          "attack": "Down",
+          "avoid": "Up",
+          "note": "Most damage up (0.786); coldest down.",
+          "zone": {
+            "xwobacon": [
+              0.507,
+              1.387,
+              0.44,
+              0.0,
+              0.584,
+              0.474,
+              0.677,
+              0.0,
+              0.0
+            ],
+            "whiff": [
+              20,
+              43,
+              33,
+              15,
+              30,
+              24,
+              40,
+              29,
+              57
+            ],
+            "freq": [
+              8,
+              9,
+              7,
+              9,
+              19,
+              14,
+              11,
+              14,
+              10
+            ]
+          },
+          "pa": 100,
+          "limited": false
+        },
+        {
+          "slot": 6,
+          "name": "Zane Zielinski",
+          "bats": "R",
+          "pos": "SS",
+          "woba": ".339",
+          "tier": "med",
+          "attack": "Up",
+          "avoid": "Middle",
+          "note": "Most damage middle (0.426); coldest up.",
+          "zone": {
+            "xwobacon": [
+              0.0,
+              0.532,
+              0.0,
+              0.676,
+              0.22,
+              0.0,
+              0.625,
+              0.417,
+              0.293
+            ],
+            "whiff": [
+              50,
+              25,
+              38,
+              15,
+              14,
+              0,
+              0,
+              46,
+              30
+            ],
+            "freq": [
+              7,
+              11,
+              11,
+              11,
+              13,
+              6,
+              5,
+              11,
+              24
+            ]
+          },
+          "pa": 74,
+          "limited": false
+        },
+        {
+          "slot": 7,
+          "name": "Jhonny Level",
+          "bats": "L",
+          "pos": "SS",
+          "woba": ".327",
+          "tier": "med",
+          "attack": "Up",
+          "avoid": "Down",
+          "note": "Most damage down (0.395); coldest up.",
+          "zone": {
+            "xwobacon": [
+              0.0,
+              0.43,
+              0.0,
+              0.0,
+              0.432,
+              0.0,
+              0.44,
+              0.426,
+              0.312
+            ],
+            "whiff": [
+              38,
+              7,
+              50,
+              0,
+              15,
+              0,
+              43,
+              0,
+              17
+            ],
+            "freq": [
+              15,
+              16,
+              5,
+              4,
+              17,
+              9,
+              12,
+              9,
+              11
+            ]
+          },
+          "pa": 60,
+          "limited": false
+        },
+        {
+          "slot": 8,
+          "name": "Walker Martin",
+          "bats": "L",
+          "pos": "SS",
+          "woba": ".324",
+          "tier": "med",
+          "attack": "Middle",
+          "avoid": "Up",
+          "note": "Most damage up (0.604); coldest middle.",
+          "zone": {
+            "xwobacon": [
+              0.97,
+              0.485,
+              0.528,
+              0.301,
+              0.517,
+              0.4,
+              0.147,
+              0.601,
+              0.345
+            ],
+            "whiff": [
+              50,
+              36,
+              19,
+              11,
+              19,
+              19,
+              12,
+              29,
+              28
+            ],
+            "freq": [
+              9,
+              15,
+              7,
+              11,
+              14,
+              11,
+              6,
+              13,
+              15
+            ]
+          },
+          "pa": 177,
+          "limited": false
+        },
+        {
+          "slot": 9,
+          "name": "Gavin Kilen",
+          "bats": "L",
+          "pos": "SS",
+          "woba": ".316",
+          "tier": "low",
+          "attack": "Down",
+          "avoid": "Middle",
+          "note": "Most damage middle (0.404); coldest down.",
+          "zone": {
+            "xwobacon": [
+              0.417,
+              0.282,
+              0.22,
+              0.237,
+              0.377,
+              0.525,
+              0.304,
+              0.238,
+              0.203
+            ],
+            "whiff": [
+              17,
+              6,
+              0,
+              5,
+              7,
+              10,
+              18,
+              15,
+              15
+            ],
+            "freq": [
+              11,
+              13,
+              9,
+              11,
+              15,
+              12,
+              8,
+              12,
+              10
+            ]
+          },
+          "pa": 219,
+          "limited": false
+        },
+        {
+          "slot": 10,
+          "name": "Zander Darby",
+          "bats": "L",
+          "pos": "3B",
+          "woba": ".314",
+          "tier": "low",
+          "attack": "Middle",
+          "avoid": "Down",
+          "note": "Most damage down (0.615); coldest middle.",
+          "zone": {
+            "xwobacon": [
+              0.126,
+              0.594,
+              0.648,
+              0.312,
+              0.33,
+              0.344,
+              0.53,
+              0.504,
+              0.988
+            ],
+            "whiff": [
+              30,
+              38,
+              19,
+              36,
+              23,
+              20,
+              21,
+              16,
+              28
+            ],
+            "freq": [
+              11,
+              10,
+              8,
+              10,
+              13,
+              14,
+              9,
+              15,
+              10
+            ]
+          },
+          "pa": 178,
+          "limited": false
+        },
+        {
+          "slot": 11,
+          "name": "Robert Hipwell",
+          "bats": "L",
+          "pos": "3B",
+          "woba": ".305",
+          "tier": "low",
+          "attack": "Up",
+          "avoid": "Middle",
+          "note": "Most damage middle (0.647); coldest up.",
+          "zone": {
+            "xwobacon": [
+              0.0,
+              0.22,
+              0.352,
+              1.64,
+              0.417,
+              0.0,
+              0.0,
+              0.71,
+              0.677
+            ],
+            "whiff": [
+              80,
+              30,
+              33,
+              29,
+              25,
+              20,
+              46,
+              33,
+              23
+            ],
+            "freq": [
+              5,
+              18,
+              10,
+              9,
+              13,
+              11,
+              12,
+              11,
+              11
+            ]
+          },
+          "pa": 90,
+          "limited": false
+        },
+        {
+          "slot": 12,
+          "name": "Dakota Jordan",
+          "bats": "R",
+          "pos": "OF",
+          "woba": ".304",
+          "tier": "low",
+          "attack": "Up",
+          "avoid": "Middle",
+          "note": "Most damage middle (0.506); coldest up.",
+          "zone": {
+            "xwobacon": [
+              0.355,
+              0.251,
+              0.176,
+              0.59,
+              0.596,
+              0.196,
+              0.846,
+              0.42,
+              0.073
+            ],
+            "whiff": [
+              32,
+              34,
+              18,
+              8,
+              16,
+              21,
+              13,
+              32,
+              37
+            ],
+            "freq": [
+              8,
+              13,
+              10,
+              9,
+              16,
+              13,
+              7,
+              12,
+              11
+            ]
+          },
+          "pa": 206,
+          "limited": false
+        },
+        {
+          "slot": 13,
+          "name": "Lisbel Diaz",
+          "bats": "R",
+          "pos": "OF",
+          "woba": ".286",
+          "tier": "low",
+          "attack": "Middle",
+          "avoid": "Down",
+          "note": "Most damage down (0.425); coldest middle.",
+          "zone": {
+            "xwobacon": [
+              0.224,
+              0.251,
+              0.43,
+              0.44,
+              0.0,
+              0.352,
+              0.29,
+              0.251,
+              0.679
+            ],
+            "whiff": [
+              5,
+              22,
+              17,
+              5,
+              16,
+              19,
+              20,
+              17,
+              37
+            ],
+            "freq": [
+              10,
+              12,
+              7,
+              11,
+              11,
+              11,
+              9,
+              16,
+              12
+            ]
+          },
+          "pa": 146,
+          "limited": false
+        },
+        {
+          "slot": 14,
+          "name": "Diego Cartaya",
+          "bats": "R",
+          "pos": "C",
+          "woba": ".268",
+          "tier": "low",
+          "attack": "Up",
+          "avoid": "Middle",
+          "note": "Most damage middle (\u2014); coldest up.",
+          "zone": {
+            "xwobacon": [
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              2.03,
+              0.0
+            ],
+            "whiff": [
+              100,
+              33,
+              100,
+              0,
+              78,
+              71,
+              33,
+              25,
+              80
+            ],
+            "freq": [
+              9,
+              9,
+              14,
+              9,
+              16,
+              14,
+              7,
+              14,
+              10
+            ]
+          },
+          "pa": 30,
+          "limited": false
+        },
+        {
+          "slot": 15,
+          "name": "Onil Perez",
+          "bats": "R",
+          "pos": "C",
+          "woba": ".206",
+          "tier": "low",
+          "attack": "Up",
+          "avoid": "Middle",
+          "note": "Most damage middle (0.266); coldest up.",
+          "zone": {
+            "xwobacon": [
+              0.0,
+              0.0,
+              0.0,
+              0.625,
+              0.0,
+              0.44,
+              0.0,
+              1.015,
+              0.0
+            ],
+            "whiff": [
+              14,
+              67,
+              20,
+              0,
+              0,
+              0,
+              50,
+              40,
+              0
+            ],
+            "freq": [
+              15,
+              11,
+              15,
+              9,
+              13,
+              11,
+              4,
+              11,
+              9
+            ]
+          },
+          "pa": 36,
+          "limited": false
+        },
+        {
+          "slot": 16,
+          "name": "Jack Payton",
+          "bats": "R",
+          "pos": "1B",
+          "woba": ".347",
+          "tier": "med",
+          "attack": "Up",
+          "avoid": "Up",
+          "note": "Most damage up (0.0); coldest up.",
+          "zone": {
+            "xwobacon": [
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              1.25,
+              0.0
+            ],
+            "whiff": [
+              0,
+              33,
+              67,
+              0,
+              33,
+              0,
+              0,
+              0,
+              0
+            ],
+            "freq": [
+              11,
+              17,
+              9,
+              11,
+              11,
+              11,
+              3,
+              6,
+              20
+            ]
+          },
+          "pa": 24,
+          "limited": true
+        },
+        {
+          "slot": 17,
+          "name": "Ty Hanchey",
+          "bats": "L",
+          "pos": "C",
+          "woba": ".263",
+          "tier": "low",
+          "attack": "Middle",
+          "avoid": "Down",
+          "note": "Most damage down (0.417); coldest middle.",
+          "zone": {
+            "xwobacon": [
+              0.0,
+              0.0,
+              0.0,
+              0.44,
+              0.312,
+              0.0,
+              0.0,
+              0.417,
+              0.0
+            ],
+            "whiff": [
+              0,
+              25,
+              0,
+              12,
+              0,
+              20,
+              0,
+              0,
+              100
+            ],
+            "freq": [
+              10,
+              8,
+              4,
+              18,
+              16,
+              10,
+              10,
+              10,
+              12
+            ]
+          },
+          "pa": 26,
+          "limited": true
+        },
+        {
+          "slot": 18,
+          "name": "Daniel Rogers",
+          "bats": "L",
+          "pos": "C",
+          "woba": ".197",
+          "tier": "low",
+          "attack": "Down",
+          "avoid": "Middle",
+          "note": "Most damage middle (0.293); coldest down.",
+          "zone": {
+            "xwobacon": [
+              0.0,
+              0.88,
+              0.0,
+              0.88,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.352
+            ],
+            "whiff": [
+              100,
+              57,
+              0,
+              17,
+              20,
+              0,
+              0,
+              0,
+              18
+            ],
+            "freq": [
+              8,
+              14,
+              5,
+              17,
+              10,
+              6,
+              11,
+              10,
+              19
+            ]
+          },
+          "pa": 25,
+          "limited": true
+        },
+        {
+          "slot": 19,
+          "name": "Luke Shliger",
+          "bats": "L",
+          "pos": "C",
+          "woba": ".111",
+          "tier": "low",
+          "attack": "Up",
+          "avoid": "Middle",
+          "note": "Most damage middle (\u2014); coldest up.",
+          "zone": {
+            "xwobacon": [
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.88,
+              0.0,
+              0.0,
+              0.0,
+              0.0
+            ],
+            "whiff": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "freq": [
+              38,
+              0,
+              0,
+              25,
+              12,
+              25,
+              0,
+              0,
+              0
+            ]
+          },
+          "pa": 8,
+          "limited": true
+        }
+      ]
+    },
+    {
+      "abbr": "SPO",
+      "name": "Indians",
+      "hitters": [
+        {
+          "slot": 1,
+          "name": "Jack O'Dowd",
+          "bats": "L",
+          "pos": "2B",
+          "woba": ".497",
+          "tier": "elite",
+          "attack": "Up",
+          "avoid": "Middle",
+          "note": "Most damage middle (0.867); coldest up.",
+          "zone": {
+            "xwobacon": [
+              0.176,
+              0.485,
+              0.625,
+              0.752,
+              0.837,
+              1.04,
+              0.0,
+              1.223,
+              0.527
+            ],
+            "whiff": [
+              47,
+              33,
+              25,
+              17,
+              10,
+              12,
+              38,
+              12,
+              10
+            ],
+            "freq": [
+              15,
+              13,
+              5,
+              13,
+              15,
+              6,
+              11,
+              12,
+              11
+            ]
+          },
+          "pa": 90,
+          "limited": false
+        },
+        {
+          "slot": 2,
+          "name": "Roynier Hernandez",
+          "bats": "L",
+          "pos": "SS",
+          "woba": ".412",
+          "tier": "elite",
+          "attack": "Middle",
+          "avoid": "Down",
+          "note": "Most damage down (0.416); coldest middle.",
+          "zone": {
+            "xwobacon": [
+              0.377,
+              0.324,
+              0.477,
+              0.25,
+              0.404,
+              0.264,
+              0.752,
+              0.104,
+              0.759
+            ],
+            "whiff": [
+              21,
+              4,
+              6,
+              7,
+              8,
+              12,
+              8,
+              0,
+              12
+            ],
+            "freq": [
+              9,
+              13,
+              10,
+              11,
+              13,
+              12,
+              8,
+              13,
+              10
+            ]
+          },
+          "pa": 173,
+          "limited": false
+        },
+        {
+          "slot": 3,
+          "name": "Max Belyeu",
+          "bats": "L",
+          "pos": "OF",
+          "woba": ".397",
+          "tier": "elite",
+          "attack": "Middle",
+          "avoid": "Up",
+          "note": "Most damage up (0.617); coldest middle.",
+          "zone": {
+            "xwobacon": [
+              0.44,
+              0.778,
+              0.63,
+              0.618,
+              0.376,
+              0.972,
+              0.33,
+              0.647,
+              0.74
+            ],
+            "whiff": [
+              23,
+              28,
+              7,
+              30,
+              10,
+              31,
+              17,
+              22,
+              28
+            ],
+            "freq": [
+              10,
+              12,
+              8,
+              15,
+              14,
+              8,
+              10,
+              14,
+              9
+            ]
+          },
+          "pa": 190,
+          "limited": false
+        },
+        {
+          "slot": 4,
+          "name": "Jacob Humphrey",
+          "bats": "R",
+          "pos": "OF",
+          "woba": ".395",
+          "tier": "elite",
+          "attack": "Middle",
+          "avoid": "Up",
+          "note": "Most damage up (0.514); coldest middle.",
+          "zone": {
+            "xwobacon": [
+              0.278,
+              0.669,
+              0.597,
+              0.32,
+              0.522,
+              0.196,
+              0.44,
+              0.609,
+              0.271
+            ],
+            "whiff": [
+              18,
+              21,
+              7,
+              14,
+              9,
+              8,
+              20,
+              22,
+              11
+            ],
+            "freq": [
+              13,
+              11,
+              10,
+              9,
+              12,
+              11,
+              4,
+              16,
+              14
+            ]
+          },
+          "pa": 149,
+          "limited": false
+        },
+        {
+          "slot": 5,
+          "name": "Ethan Hedges",
+          "bats": "R",
+          "pos": "3B",
+          "woba": ".348",
+          "tier": "med",
+          "attack": "Down",
+          "avoid": "Middle",
+          "note": "Most damage middle (0.605); coldest down.",
+          "zone": {
+            "xwobacon": [
+              0.694,
+              0.467,
+              0.22,
+              0.544,
+              0.669,
+              0.66,
+              0.676,
+              0.462,
+              0.126
+            ],
+            "whiff": [
+              14,
+              20,
+              43,
+              0,
+              23,
+              43,
+              7,
+              29,
+              43
+            ],
+            "freq": [
+              11,
+              14,
+              11,
+              9,
+              11,
+              13,
+              8,
+              11,
+              12
+            ]
+          },
+          "pa": 197,
+          "limited": false
+        },
+        {
+          "slot": 6,
+          "name": "Tommy Hopfe",
+          "bats": "L",
+          "pos": "1B",
+          "woba": ".348",
+          "tier": "med",
+          "attack": "Up",
+          "avoid": "Down",
+          "note": "Most damage down (0.594); coldest up.",
+          "zone": {
+            "xwobacon": [
+              0.355,
+              0.16,
+              0.406,
+              0.376,
+              0.245,
+              0.71,
+              0.44,
+              0.628,
+              0.758
+            ],
+            "whiff": [
+              12,
+              11,
+              14,
+              5,
+              25,
+              27,
+              23,
+              14,
+              27
+            ],
+            "freq": [
+              12,
+              11,
+              7,
+              12,
+              16,
+              8,
+              11,
+              15,
+              8
+            ]
+          },
+          "pa": 160,
+          "limited": false
+        },
+        {
+          "slot": 7,
+          "name": "Alan Espinal",
+          "bats": "R",
+          "pos": "C",
+          "woba": ".333",
+          "tier": "med",
+          "attack": "Middle",
+          "avoid": "Up",
+          "note": "Most damage up (0.768); coldest middle.",
+          "zone": {
+            "xwobacon": [
+              0.22,
+              1.018,
+              0.752,
+              0.582,
+              0.201,
+              0.176,
+              0.758,
+              0.483,
+              0.0
+            ],
+            "whiff": [
+              12,
+              17,
+              41,
+              0,
+              19,
+              25,
+              0,
+              25,
+              67
+            ],
+            "freq": [
+              12,
+              10,
+              9,
+              8,
+              15,
+              18,
+              6,
+              11,
+              11
+            ]
+          },
+          "pa": 134,
+          "limited": false
+        },
+        {
+          "slot": 8,
+          "name": "Kelvin Hidalgo",
+          "bats": "R",
+          "pos": "SS",
+          "woba": ".306",
+          "tier": "low",
+          "attack": "Down",
+          "avoid": "Middle",
+          "note": "Most damage middle (0.553); coldest down.",
+          "zone": {
+            "xwobacon": [
+              0.389,
+              1.015,
+              0.389,
+              0.264,
+              0.608,
+              0.687,
+              0.176,
+              0.684,
+              0.266
+            ],
+            "whiff": [
+              15,
+              31,
+              33,
+              10,
+              11,
+              0,
+              12,
+              33,
+              21
+            ],
+            "freq": [
+              12,
+              9,
+              14,
+              9,
+              16,
+              14,
+              5,
+              12,
+              9
+            ]
+          },
+          "pa": 186,
+          "limited": false
+        },
+        {
+          "slot": 9,
+          "name": "Tevin Tucker",
+          "bats": "R",
+          "pos": "SS",
+          "woba": ".300",
+          "tier": "low",
+          "attack": "Up",
+          "avoid": "Down",
+          "note": "Most damage down (0.354); coldest up.",
+          "zone": {
+            "xwobacon": [
+              0.251,
+              0.378,
+              0.0,
+              0.293,
+              0.22,
+              0.44,
+              0.0,
+              0.33,
+              0.417
+            ],
+            "whiff": [
+              38,
+              22,
+              22,
+              0,
+              0,
+              10,
+              0,
+              10,
+              30
+            ],
+            "freq": [
+              12,
+              16,
+              8,
+              6,
+              9,
+              16,
+              6,
+              16,
+              12
+            ]
+          },
+          "pa": 112,
+          "limited": false
+        },
+        {
+          "slot": 10,
+          "name": "Jacob Hinderleider",
+          "bats": "R",
+          "pos": "SS",
+          "woba": ".275",
+          "tier": "low",
+          "attack": "Down",
+          "avoid": "Up",
+          "note": "Most damage up (0.718); coldest down.",
+          "zone": {
+            "xwobacon": [
+              0.758,
+              0.528,
+              0.97,
+              0.0,
+              0.594,
+              0.88,
+              0.0,
+              0.237,
+              0.587
+            ],
+            "whiff": [
+              21,
+              33,
+              50,
+              18,
+              21,
+              20,
+              20,
+              31,
+              43
+            ],
+            "freq": [
+              12,
+              14,
+              8,
+              8,
+              15,
+              12,
+              7,
+              14,
+              9
+            ]
+          },
+          "pa": 102,
+          "limited": false
+        },
+        {
+          "slot": 11,
+          "name": "Robert Calaz",
+          "bats": "R",
+          "pos": "OF",
+          "woba": ".271",
+          "tier": "low",
+          "attack": "Up",
+          "avoid": "Down",
+          "note": "Most damage down (0.575); coldest up.",
+          "zone": {
+            "xwobacon": [
+              0.22,
+              0.126,
+              0.274,
+              0.203,
+              0.293,
+              0.396,
+              0.82,
+              0.852,
+              0.392
+            ],
+            "whiff": [
+              20,
+              38,
+              17,
+              19,
+              17,
+              30,
+              36,
+              40,
+              26
+            ],
+            "freq": [
+              8,
+              13,
+              12,
+              8,
+              13,
+              11,
+              8,
+              10,
+              16
+            ]
+          },
+          "pa": 178,
+          "limited": false
+        },
+        {
+          "slot": 12,
+          "name": "Kevin Fitzer",
+          "bats": "R",
+          "pos": "1B",
+          "woba": ".264",
+          "tier": "low",
+          "attack": "Down",
+          "avoid": "Middle",
+          "note": "Most damage middle (0.424); coldest down.",
+          "zone": {
+            "xwobacon": [
+              0.312,
+              0.25,
+              0.625,
+              0.376,
+              0.538,
+              0.22,
+              0.254,
+              0.164,
+              0.421
+            ],
+            "whiff": [
+              31,
+              45,
+              50,
+              14,
+              14,
+              33,
+              14,
+              22,
+              24
+            ],
+            "freq": [
+              13,
+              11,
+              11,
+              12,
+              12,
+              9,
+              7,
+              12,
+              13
+            ]
+          },
+          "pa": 177,
+          "limited": false
+        },
+        {
+          "slot": 13,
+          "name": "Juan Castillo",
+          "bats": "R",
+          "pos": "C",
+          "woba": ".245",
+          "tier": "low",
+          "attack": "Up",
+          "avoid": "Down",
+          "note": "Most damage down (0.504); coldest up.",
+          "zone": {
+            "xwobacon": [
+              0.176,
+              0.293,
+              0.0,
+              0.694,
+              0.179,
+              0.0,
+              1.26,
+              0.0,
+              0.0
+            ],
+            "whiff": [
+              27,
+              50,
+              42,
+              14,
+              16,
+              27,
+              11,
+              12,
+              14
+            ],
+            "freq": [
+              12,
+              14,
+              13,
+              11,
+              15,
+              13,
+              7,
+              7,
+              9
+            ]
+          },
+          "pa": 90,
+          "limited": false
+        },
+        {
+          "slot": 14,
+          "name": "Caleb Hobson",
+          "bats": "R",
+          "pos": "OF",
+          "woba": ".211",
+          "tier": "low",
+          "attack": "Middle",
+          "avoid": "Up",
+          "note": "Most damage up (0.312); coldest middle.",
+          "zone": {
+            "xwobacon": [
+              0.625,
+              0.0,
+              0.0,
+              0.352,
+              0.0,
+              0.0,
+              0.44,
+              0.0,
+              0.88
+            ],
+            "whiff": [
+              33,
+              40,
+              20,
+              25,
+              44,
+              25,
+              33,
+              50,
+              50
+            ],
+            "freq": [
+              16,
+              11,
+              8,
+              9,
+              16,
+              15,
+              8,
+              8,
+              8
+            ]
+          },
+          "pa": 51,
+          "limited": false
+        }
+      ]
+    }
+  ]
+};
+
+/* ===================== render ===================== */
+const $ = (id)=>document.getElementById(id);
+let state = { team:0, metric: ARM_DATA.zoneMetrics[0].key, hitter:null };
+
+function tierClass(t){return t;}
+function colorScale(metric, v){
+  // returns a green->yellow->red color. xwobacon ~ .250-.700; whiff% inverse; freq neutral
+  let t;
+  if(metric==="xwobacon"){ t=(v-.260)/(.700-.260); }
+  else if(metric==="whiff"){ t=1-((v-7)/(34-7)); }      // high whiff = good for pitcher = cold
+  else { t=(v-7)/(16-7); }                               // freq: just density
+  t=Math.max(0,Math.min(1,t));
+  // green(31,138,76) -> yellow(212,209,82) -> red(239,83,80)
+  let r,g,b;
+  if(t<.5){const k=t/.5; r=31+(212-31)*k; g=138+(209-138)*k; b=76+(82-76)*k;}
+  else{const k=(t-.5)/.5; r=212+(239-212)*k; g=209+(83-209)*k; b=82+(80-82)*k;}
+  return `rgb(${r|0},${g|0},${b|0})`;
+}
+function fmt(metric,v){ return metric==="xwobacon" ? v.toFixed(3).replace(/^0/,'') : v+(metric==="whiff"||metric==="freq"?"%":""); }
+
+function renderArm(){
+  const m=ARM_DATA.meta;
+  $('armName').textContent=m.name;
+  $('armSub').innerHTML=m.line+'  ·  <b>'+m.asOf+'</b>';
+  $('armRep').innerHTML=ARM_DATA.repertoire.map(p=>
+    `<span class="pill"><span class="dot" style="background:${p.color}"></span>${p.name}</span>`).join('');
+  $('sampleBadge').style.display = m.isSample ? '' : 'none';
+  $('footSrc').textContent=m.source;
+  $('footNote').textContent=m.note;
+  $('keys').innerHTML=ARM_DATA.keys.map(k=>
+    `<div class="key"><div class="num">${k.n}</div><div class="txt">${k.html}</div></div>`).join('');
+  $('metricToggle').innerHTML=ARM_DATA.zoneMetrics.map(z=>
+    `<button data-k="${z.key}" class="${z.key===state.metric?'on':''}" onclick="setMetric('${z.key}')">${z.label}</button>`).join('');
+  // arsenal (optional)
+  if(ARM_DATA.arsenal && ARM_DATA.arsenal.length){
+    $('arsSec').style.display='';
+    const maxUse=Math.max(...ARM_DATA.arsenal.map(a=>a.use));
+    $('ars').innerHTML=ARM_DATA.arsenal.map(a=>`
+      <div class="apitch">
+        <div class="r1">
+          <span class="nm"><span class="dot" style="background:${a.color}"></span>${a.name}</span>
+          <span class="use">${a.use.toFixed(1)}%</span>
+          <span class="wf">${a.whiff.toFixed(0)}% whiff</span>
+        </div>
+        <div class="usebar"><i style="width:${100*a.use/maxUse}%;background:${a.color}"></i></div>
+        <div class="specs">
+          <span><b>${a.velo.toFixed(1)}</b> mph</span>
+          <span>IVB <b>${a.ivb>0?'+':''}${a.ivb.toFixed(1)}"</b></span>
+          <span>HB <b>${a.hb>0?'+':''}${a.hb.toFixed(1)}"</b></span>
+          <span><b>${a.spin}</b> rpm</span>
+          <span>vL <b>${a.vl.toFixed(0)}%</b> / vR <b>${a.vr.toFixed(0)}%</b></span>
+          ${a.note?`<span style="color:var(--gold-soft)">${a.note}</span>`:''}
+        </div>
+      </div>`).join('');
+  }
+}
+function renderTeams(){
+  $('teams').innerHTML=ARM_DATA.opponents.map((t,i)=>
+    `<button class="team ${i===state.team?'on':''}" onclick="setTeam(${i})">${t.abbr} ${t.name}</button>`).join('');
+}
+function renderCards(){
+  const t=ARM_DATA.opponents[state.team];
+  $('cards').innerHTML=t.hitters.map((h,i)=>`
+    <div class="hcard${h.limited?' lim':''}" onclick="openSheet(${i})">
+      <div class="row1">
+        <span class="slot">${h.slot}</span>
+        <span class="chips">
+          ${h.limited?`<span class="limbadge">LIM · ${h.pa} PA</span>`:''}
+          <span class="tier ${tierClass(h.tier)}">${h.tier}</span>
+        </span>
+      </div>
+      <h3>${h.name}</h3>
+      <div class="meta">${h.bats}HH · ${h.pos} · wOBA ${h.woba}${h.limited?' · small sample':''}</div>
+      <div class="aa">
+        <div class="box attack"><div class="lab">ATTACK</div><div class="val">${h.attack}</div></div>
+        <div class="box avoid"><div class="lab">AVOID</div><div class="val">${h.avoid}</div></div>
+      </div>
+      <div class="tapcue">tap ›</div>
+    </div>`).join('');
+}
+function renderZone(){
+  if(state.hitter===null)return;
+  const h=ARM_DATA.opponents[state.team].hitters[state.hitter];
+  const g=(h.zone&&h.zone[state.metric])||[];
+  $('zone').innerHTML=g.map(v=>`<div class="cell" style="background:${colorScale(state.metric,v)}">${fmt(state.metric,v)}</div>`).join('');
+  const lab=ARM_DATA.zoneMetrics.find(z=>z.key===state.metric).label;
+  $('zoneMetricLabel').textContent=lab+" by zone";
+}
+function openSheet(i){
+  state.hitter=i;
+  const h=ARM_DATA.opponents[state.team].hitters[i];
+  $('dName').textContent=h.name;
+  $('dMeta').textContent=`${h.bats}HH · ${h.pos} · wOBA ${h.woba}`;
+  $('dTier').textContent=h.tier; $('dTier').className='tier '+tierClass(h.tier);
+  const ln=document.getElementById('limnote'); if(ln) ln.remove();
+  if(h.limited){
+    const d=document.createElement('div'); d.id='limnote'; d.className='limnote';
+    d.textContent=`Limited sample — ${h.pa} PA. Treat the zone map as directional only; lean on handedness and overall tendency.`;
+    $('dMeta').insertAdjacentElement('afterend', d);
+  }
+  $('dAttack').textContent=h.attack; $('dAvoid').textContent=h.avoid;
+  const bm=ARM_DATA.bucketMap||{};
+  $('dAttack').innerHTML=h.attack+(bm[h.attack]?`<div class="planmap">→ ${bm[h.attack]}</div>`:'');
+  $('dAvoid').innerHTML=h.avoid+(bm[h.avoid]?`<div class="planmap">→ ${bm[h.avoid]}</div>`:'');
+  $('dNote').textContent=h.note||'';
+  renderZone();
+  renderBuckets(h);
+  $('sheetBg').classList.add('on'); $('sheet').classList.add('on');
+}
+function renderBuckets(h){
+  // derive simple bucket bars from the zone xwobacon (min/middle/max regions) if no explicit buckets
+  const z=(h.zone&&h.zone.xwobacon)||[];
+  const rows=[
+    {nm:"Heater up", v:(z[0]+z[1]+z[2])/3},
+    {nm:"Middle / hittable", v:(z[3]+z[4]+z[5])/3},
+    {nm:"Down / spin", v:(z[6]+z[7]+z[8])/3}
+  ];
+  $('buckets').innerHTML=rows.map(r=>`
+    <div class="bucket">
+      <div class="top"><span class="nm">${r.nm}</span><span class="vl">${r.v.toFixed(3).replace(/^0/,'')} xwOBACON</span></div>
+      <div class="track"><div class="fill" style="width:${Math.max(6,Math.min(100,(r.v-.250)/(.700-.250)*100))}%;background:${colorScale('xwobacon',r.v)}"></div></div>
+    </div>`).join('');
+}
+function setMetric(k){ state.metric=k; document.querySelectorAll('#metricToggle button').forEach(b=>b.classList.toggle('on',b.dataset.k===k)); renderZone(); }
+function setTeam(i){ state.team=i; renderTeams(); renderCards(); }
+function closeSheet(){ $('sheetBg').classList.remove('on'); $('sheet').classList.remove('on'); state.hitter=null; }
+
+renderArm(); renderTeams(); renderCards();
+</script>
+</body>
+</html>
